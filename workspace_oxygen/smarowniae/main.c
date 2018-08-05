@@ -104,9 +104,9 @@ int main(void)
 	initInterrupt0();//test guzik
 	 TIME1= time_switch();
 	 TIME2= test_butt();
-
+asdasdasasd
 	 while(1);
-adsfsd
+
 	 return 0;
 }
 
