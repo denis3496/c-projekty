@@ -26,7 +26,7 @@
 #define BTS (1<<PD7)
 #define CEWKA (1<<PD6)
 #define KONTROLKA (1<<PD7)
-#define TEST (1<<PB2)
+#define TEST (1<<PD2)
 #define BUZZ (1<<PB0)
 #define T_TEST (1<<PB2)
 #define T_POZIOM (1<<PB1)
@@ -46,11 +46,12 @@ void io_init()
 	  //WEJ NA DIP Z REZYSTORAMI PULL DOWN, PD4-WEJ, PD5- WEJ KONTROLKA,PD6-WYJ NA CEWKE, PD7-WY NA BTS
 	//tymczasowo:
 	  DDRD = 0b11111011; //0- PD2 GUZIK
-	  DDRD &= ~(1<<PD2);//Makes firs pin of PORTD as Input
-	  PORTD |= (1<<PD2);
+	  DDRD &= ~TEST;//Makes firs pin of PORTD as Input
+	  PORTD |= TEST;
 
 	  DDRB = 0b00111001;
 	  // PB0- WYJ NA BUZZ, PB1(T_POZIOM), PB2(T_TEST)- WEJSCIA Z TRANSOPTORA, PB3(OC2-pwm),PB4,PB5-MAGISTRALA SPI
+	  PORTB&=~BUZZ;
 
 	  DDRC = 0b11110000; // DIPY
 	  PORTC = 0b00001111; // pull up
@@ -88,6 +89,7 @@ void initInterrupt0(void) {
 }
 
 uint16_t time_switch()
+
 {
 	unsigned char io = PINC; // normalnie pind
 	uint16_t tmp;
@@ -97,7 +99,10 @@ uint16_t time_switch()
 	else if((io & DIP3)==0) tmp=30;
 	else if((io & DIP4)==0) tmp=40;
 	else tmp=10; // domyslnie
-
+	for(int i=0;i<4;i++){// podwojne pikniecie- zatwierdzenie czasu
+	    			PORTB^=BUZZ;
+	    			_delay_ms(100);
+	    		}
 	return tmp;
 }
 
@@ -117,9 +122,19 @@ ISR(INT0_vect) { //TYLKO NA PINIE PD2!!!
         timer++; // count how long button is pressed
         lcd_locate(1,1);
         lcd_int(timer);
-           _delay_ms(500);
+        for(int i=0;i<2;i++){// pojedyncze pikniecie
+            			PORTB^=BUZZ;
+            			_delay_ms(100);
+            		}
     }
-    	if(timer !=0) motor_wait = timer;
+    	if(timer !=0) {
+    		motor_wait = timer;
+    		_delay_ms(300);
+    		for(int i=0;i<4;i++){// podwojne pikniecie- zatwierdzenie czasu
+    			PORTB^=BUZZ;
+    			_delay_ms(100);
+    		}
+    	}
 
 }
 ISR(TIMER1_COMPA_vect) //tik co ok. 1 sekunde
