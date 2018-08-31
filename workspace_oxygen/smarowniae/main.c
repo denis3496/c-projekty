@@ -26,14 +26,17 @@
 #define T_TEST (1<<PD2)
 // rejestr OC2, wysylamy na BTS PWM
 #define BTS_WEJ (1<<PD7) // ZMIENIC POZNIEJ NA PB3 w ATMEDZE8
-// info zwrotne z BTS od silnika
+// zalacza cewke- wyjscie DODAC OBSLUGE
 #define CEWKA_IO (1<<PD6)
 // wyjscie na BTS od kontrolki
 #define KONTROLKA_IO (1<<PD5)
 //sygnalizuje ustawienie czasu przyciskiem test
 #define BUZZ (1<<PB0)
-//dodac obsluge!
+//zapala kontrolke ciaglym swiatlem gdy dostanie sygnal(mase)
 #define T_POZIOM (1<<PB1)
+
+#define T_PRZYC_KAB (1<<PC0)
+#define T_CZUJ_CIS (1<<PC1)
 //--------------------------------------
 #define IDLE 0
 #define ACTIVE 50 // odpowiada wypelnieniu PWM
@@ -42,18 +45,22 @@ volatile unsigned char MOTOR_STAN;
 #define czas_pracy 10 //ile sek krecic, kreci 10 sek i wylacza
 volatile uint16_t motor_wait;//co ile wlaczac silnik
 volatile uint16_t sek_count;// volatile mowi ze zmienna nalezy do wielu watkow dlatego nie mozna jej optymalizowac
+volatile uint16_t t_pomiaru;
 //------------------------------------------
 void io_init()
 {
-	  DDRD = 0b10100000;
+	  DDRD = 0b11100000;
 	  //DDRD &= ~T_TEST; alternatywny zapis
-	  PORTD =0b01011111;//pull up dla wejsc
+	  PORTD =0b00011111;//pull up dla wejsc
 
 	  DDRB = 0b00111001;
 	  // PB0- WYJ NA BUZZ, PB1(T_POZIOM), PB2(T_TEST)- WEJSCIA Z TRANSOPTORA, PB3(OC2-pwm),PB4,PB5-MAGISTRALA SPI
+	  PORTB |= T_POZIOM;// pull-up dla wejscia z transopt.
+
 	  PORTB&=~BUZZ;// zeruje wyjscie buzzera
 
-
+	  DDRC &= ~(T_PRZYC_KAB & T_CZUJ_CIS); //wejscie
+	  PORTC |= (T_PRZYC_KAB & T_CZUJ_CIS);//pullup
 }
 
 void initInterrupt2(void) {// TIMER1 INIT
@@ -87,9 +94,8 @@ void initInterrupt0(void) {
 }
 
 uint16_t time_switch()
-
 {
-	unsigned char io = PINC; // normalnie pind
+	unsigned char io = PIND; // normalnie pind
 	uint16_t tmp;
 
 	if((io & DIP1)==0) tmp=15; // GDY ZALACZONY POSZCZEGOLNY SWITCH. trzeba zresetowac po zmianie
@@ -105,12 +111,37 @@ uint16_t time_switch()
 }
 
 void greeting(){
+
 	char napis1[] = "HELLO";
 	lcd_cls();
 		lcd_locate(1,1);
 		lcd_str(napis1);
 		_delay_ms(1500);
 		lcd_cls();
+}
+
+void check_transoptor_io(){
+	if((PINB & T_POZIOM)==0) {
+		PORTD^=KONTROLKA_IO; // MIGA kontrolke 1 RAZ(przez BTS)
+		_delay_ms(100);
+		PORTD^=KONTROLKA_IO;
+
+	}
+	else PORTD|=KONTROLKA_IO;
+
+	if((PINC & T_CZUJ_CIS)==0) {
+		for(int i=0;i<4;i++){// podwojne migniecie- czujnik cisnienia
+						PORTD^=KONTROLKA_IO;
+		    			_delay_ms(100);
+		    		}
+	}
+
+	if((PINC & T_PRZYC_KAB)==0) {
+			for(int i=0;i<6;i++){// potrojne migniecie- przycisk kabina
+							PORTD^=KONTROLKA_IO;
+			    			_delay_ms(100);
+			    		}
+		}
 }
 
 ISR(INT0_vect) { //TYLKO NA PINIE PD2!!!
@@ -159,6 +190,8 @@ ISR(TIMER1_COMPA_vect) //tik co ok. 1 sekunde
 		   sek_count =0; //zliczaj od nowa sekundy
 	   }
 
+	   if(sek_count%5==0) check_transoptor_io(); // sprawdzamy co 5 sekund wejscia z czujnika i btsa
+
 
 
 
@@ -175,6 +208,7 @@ int main(void)
 
 	greeting();
 	motor_wait= time_switch();
+	check_transoptor_io();
 
 	initInterrupt1();//pwm
 	initInterrupt0();//test guzik
