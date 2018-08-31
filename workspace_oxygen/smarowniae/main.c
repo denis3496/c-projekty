@@ -18,10 +18,10 @@
 #include <string.h>
 #include "lcd44780.h"
 
-#define DIP1 (1<<PD0)
-#define DIP2 (1<<PD1)
-#define DIP3 (1<<PD2)
-#define DIP4 (1<<PD3)
+#define DIP1 (1<<PC0) // zmienic na PD w docelowym
+#define DIP2 (1<<PC1)
+#define DIP3 (1<<PC2)
+#define DIP4 (1<<PC3)
 //dip switche
 #define BTS (1<<PD7)
 #define CEWKA (1<<PD6)
@@ -45,12 +45,15 @@ void io_init()
 	//  DDRD = 0b11000000;
 	  //WEJ NA DIP Z REZYSTORAMI PULL DOWN, PD4-WEJ, PD5- WEJ KONTROLKA,PD6-WYJ NA CEWKE, PD7-WY NA BTS
 	//tymczasowo:
-	  DDRD = 0b11111011; //PD2 GUZIK
+	  DDRD = 0b11111011; //0- PD2 GUZIK
 	  DDRD &= ~(1<<PD2);//Makes firs pin of PORTD as Input
 	  PORTD |= (1<<PD2);
 
 	  DDRB = 0b00111001;
 	  // PB0- WYJ NA BUZZ, PB1(T_POZIOM), PB2(T_TEST)- WEJSCIA Z TRANSOPTORA, PB3(OC2-pwm),PB4,PB5-MAGISTRALA SPI
+
+	  DDRC = 0b11110000; // DIPY
+	  PORTC = 0b00001111; // pull up
 
 }
 
@@ -84,15 +87,16 @@ void initInterrupt0(void) {
     MCUCR |= (1 << ISC01); // trigger interrupt on falling edge
 }
 
-uint8_t time_switch()
+uint16_t time_switch()
 {
-	unsigned char io = PIND;
-	uint8_t tmp;
+	unsigned char io = PINC; // normalnie pind
+	uint16_t tmp;
 
-/*	if((io & DIP1)==0) tmp=10; // GDY ZALACZONY POSZCZEGOLNY SWITCH. trzeba zresetowac po zmianie
-	if((io & DIP2)==0) tmp=20;
-	if((io & DIP3)==0) tmp=30;
-	if((io & DIP4)==0) tmp=40;*/
+	if((io & DIP1)==0) tmp=15; // GDY ZALACZONY POSZCZEGOLNY SWITCH. trzeba zresetowac po zmianie
+	else if((io & DIP2)==0) tmp=20;
+	else if((io & DIP3)==0) tmp=30;
+	else if((io & DIP4)==0) tmp=40;
+	else tmp=10; // domyslnie
 
 	return tmp;
 }
@@ -148,7 +152,7 @@ ISR(TIMER1_COMPA_vect) //tik co ok. 1 sekunde
 }
 int main(void)
 {
-	uint8_t TIME1, TIME2;
+
 	  DDRD |= (1<<PD1); //Nakes first pin of PORTC as Output
 	  PORTD |= (1<<PD1); //WYLACZA LED BO DO LED DO VCC. GDYBY LED BYL DO MASY TO TA KOMENDA WLACZA LED
 	io_init();
@@ -156,13 +160,11 @@ int main(void)
 
 
 	greeting();
+	motor_wait= time_switch();
+
 	initInterrupt1();//pwm
 	initInterrupt0();//test guzik
 	initInterrupt2();//pokazuje czas co 3 sekundy
-
-
-	 TIME1= time_switch();
-	// TIME2= test_butt();
 
 	sei();
 
