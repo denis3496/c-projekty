@@ -17,20 +17,23 @@
 #include <avr/pgmspace.h>
 #include <string.h>
 #include "lcd44780.h"
-
-#define DIP1 (1<<PC0) // zmienic na PD w docelowym
-#define DIP2 (1<<PC1)
-#define DIP3 (1<<PC2)
-#define DIP4 (1<<PC3)
 //dip switche
-#define BTS (1<<PD7)
-#define CEWKA (1<<PD6)
-#define KONTROLKA (1<<PD7)
-#define TEST (1<<PD2)
+#define DIP1 (1<<PD0)
+#define DIP2 (1<<PD1)
+#define DIP3 (1<<PD3)
+#define DIP4 (1<<PD4)
+//guzik przez transoptor, INT0
+#define T_TEST (1<<PD2)
+// rejestr OC2, wysylamy na BTS PWM
+#define BTS_WEJ (1<<PD7) // ZMIENIC POZNIEJ NA PB3 w ATMEDZE8
+// info zwrotne z BTS od silnika
+#define CEWKA_IO (1<<PD6)
+// wyjscie na BTS od kontrolki
+#define KONTROLKA_IO (1<<PD5)
+//sygnalizuje ustawienie czasu przyciskiem test
 #define BUZZ (1<<PB0)
-#define T_TEST (1<<PB2)
+//dodac obsluge!
 #define T_POZIOM (1<<PB1)
-//wszystkie io- wejscia zanegowac!!!
 //--------------------------------------
 #define IDLE 0
 #define ACTIVE 50 // odpowiada wypelnieniu PWM
@@ -42,19 +45,14 @@ volatile uint16_t sek_count;// volatile mowi ze zmienna nalezy do wielu watkow d
 //------------------------------------------
 void io_init()
 {
-	//  DDRD = 0b11000000;
-	  //WEJ NA DIP Z REZYSTORAMI PULL DOWN, PD4-WEJ, PD5- WEJ KONTROLKA,PD6-WYJ NA CEWKE, PD7-WY NA BTS
-	//tymczasowo:
-	  DDRD = 0b11111011; //0- PD2 GUZIK
-	  DDRD &= ~TEST;//Makes firs pin of PORTD as Input
-	  PORTD |= TEST;
+	  DDRD = 0b10100000;
+	  //DDRD &= ~T_TEST; alternatywny zapis
+	  PORTD =0b01011111;//pull up dla wejsc
 
 	  DDRB = 0b00111001;
 	  // PB0- WYJ NA BUZZ, PB1(T_POZIOM), PB2(T_TEST)- WEJSCIA Z TRANSOPTORA, PB3(OC2-pwm),PB4,PB5-MAGISTRALA SPI
-	  PORTB&=~BUZZ;
+	  PORTB&=~BUZZ;// zeruje wyjscie buzzera
 
-	  DDRC = 0b11110000; // DIPY
-	  PORTC = 0b00001111; // pull up
 
 }
 
@@ -74,8 +72,8 @@ void initInterrupt2(void) {// TIMER1 INIT
 void initInterrupt1(void)
 {
 
-	    TCCR0=0b01110101; //Configure TCCR0 as explained in the article
-	    OCR0=0; // Set OCR0 to 0 so that the duty cycle is initially 0 and the motor is not rotating, 127- plynnie jedzie
+	    TCCR2=0b01110101; //Configure TCCR0 as explained in the article
+	    OCR2=0; // Set OCR0 to 0 so that the duty cycle is initially 0 and the motor is not rotating, 127- plynnie jedzie
 	   /*	TCCR0= [FOC0	|WGM00|	COM01|	COM00|	WGM01|	CS02|	CS01|	CS00]
 	    Set bits WGM00 and WGM01 to 1 and 0 respectively. This enables the phase correct PWM mode.
 	    Set bits COM00 and COM01 to 0 and 1 respectively. This means that the generated PWM will be an inverted PWM.
@@ -129,6 +127,7 @@ ISR(INT0_vect) { //TYLKO NA PINIE PD2!!!
     }
     	if(timer !=0) {
     		motor_wait = timer;
+    		sek_count = 0; //wyzeruj globalny czas po zadaniu nowego
     		_delay_ms(300);
     		for(int i=0;i<4;i++){// podwojne pikniecie- zatwierdzenie czasu
     			PORTB^=BUZZ;
@@ -151,12 +150,12 @@ ISR(TIMER1_COMPA_vect) //tik co ok. 1 sekunde
 
 	   if(sek_count==czas_pracy && MOTOR_STAN==ACTIVE)  {
 		   MOTOR_STAN=IDLE;
-		   OCR0 =0; // WLACZA SILNIK LUB WYLACZA CO 3 SEKUNDY NA PRZEMIAN
+		   OCR2 =0; // WLACZA SILNIK LUB WYLACZA CO 3 SEKUNDY NA PRZEMIAN
 		   sek_count =0; //zliczaj od nowa sekundy
 	   }
 	   else if(sek_count==motor_wait && MOTOR_STAN==IDLE){
 		   MOTOR_STAN=ACTIVE;
-		   OCR0 = 50;
+		   OCR2 = 35;
 		   sek_count =0; //zliczaj od nowa sekundy
 	   }
 

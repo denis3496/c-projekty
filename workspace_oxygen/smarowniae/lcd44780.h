@@ -43,24 +43,24 @@
 //
 //----------------------------------------------------------------------------------------
 // tu konfigurujemy port i piny do jakich pod³¹czymy linie D7..D4 LCD
-#define LCD_D7PORT  D //D5 arduino
+#define LCD_D7PORT  A
 #define LCD_D7 7
-#define LCD_D6PORT  D //D6
+#define LCD_D6PORT  A
 #define LCD_D6 6
-#define LCD_D5PORT D //D7
+#define LCD_D5PORT A
 #define LCD_D5 5
-#define LCD_D4PORT  D //B0
+#define LCD_D4PORT  A
 #define LCD_D4 4
 
 
 // tu definiujemy piny procesora do których pod³¹czamy sygna³y RS,RW, E
-#define LCD_RSPORT D //B2
-#define LCD_RS 0
+#define LCD_RSPORT A
+#define LCD_RS 2
 //#define LCD_RWPORT C //USE_RW USTAWIONE NA 0
 //#define LCD_RW 4
 
-#define LCD_EPORT D
-#define LCD_E 3 //B1
+#define LCD_EPORT A
+#define LCD_E 3
 //------------------------------------------------  koniec ustawieñ sprzêtowych ---------------
 
 
